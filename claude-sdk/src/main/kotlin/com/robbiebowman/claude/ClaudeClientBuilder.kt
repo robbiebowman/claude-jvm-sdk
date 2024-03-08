@@ -40,6 +40,13 @@ class ClaudeClientBuilder {
         return this
     }
 
+    private var systemPrompt: String? = null
+
+    fun withSystemPrompt(systemPrompt: String): ClaudeClientBuilder {
+        this.systemPrompt = systemPrompt
+        return this
+    }
+
     private fun validate(): List<String> {
         val errors = mutableListOf<String>()
         if (apiKey == null) {
@@ -57,7 +64,8 @@ class ClaudeClientBuilder {
                     model = model,
                     okHttpClient = okHttpClient,
                     maxTokens = maxTokens,
-                    gson = gson
+                    gson = gson,
+                    systemPrompt = systemPrompt
                 )
             } ?: throw Exception("No API key provided")
         } else throw Exception(errors.joinToString())

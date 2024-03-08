@@ -1,6 +1,7 @@
 package com.robbiebowman.claude
 
 import com.google.gson.Gson
+import com.robbiebowman.claude.json.ChatRequestBody
 import com.robbiebowman.claude.json.ChatResponse
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -12,21 +13,20 @@ class ClaudeClient internal constructor(
     private val model: String,
     private val okHttpClient: OkHttpClient,
     private val maxTokens: Int,
-    private val gson: Gson
+    private val gson: Gson,
+    private val systemPrompt: String?
 ) {
 
     fun getChatCompletion(messages: List<Message>): ChatResponse {
-        val messagesJson = gson.toJson(messages.map { getSerializableMessage(it, okHttpClient) })
-        val request = Request.Builder().post(
-            """
-            {
-              "model": "$model",
-              "max_tokens": $maxTokens,
-              "messages": $messagesJson
-            }
-        """.trimIndent().toRequestBody()
-        ).url("https://api.anthropic.com/v1/messages").header("x-api-key", apiKey)
-            .header("anthropic-version", "2023-06-01").header("content-type", "application/json")
+        val serializableMessages = messages.map { getSerializableMessage(it, okHttpClient) }
+        val requestBody = ChatRequestBody(model, maxTokens, serializableMessages, systemPrompt)
+        val requestJson = gson.toJson(requestBody)
+        val request = Request.Builder()
+            .post(requestJson.toRequestBody())
+            .url("https://api.anthropic.com/v1/messages")
+            .header("x-api-key", apiKey)
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
         val response = okHttpClient.newCall(request.build()).execute()
         return gson.fromJson(response.body?.string(), ChatResponse::class.java)
     }
