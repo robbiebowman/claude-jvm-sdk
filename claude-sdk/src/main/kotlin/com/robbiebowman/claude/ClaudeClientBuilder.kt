@@ -1,7 +1,14 @@
 package com.robbiebowman.claude
 
 import com.google.gson.Gson
+import com.robbiebowman.claude.xml.Parameter
+import com.robbiebowman.claude.xml.ToolDescription
+import jdk.jfr.Description
 import okhttp3.OkHttpClient
+import kotlin.reflect.KFunction
+import kotlin.reflect.KType
+import kotlin.reflect.full.isSupertypeOf
+import kotlin.reflect.typeOf
 
 class ClaudeClientBuilder {
 
@@ -47,6 +54,31 @@ class ClaudeClientBuilder {
         return this
     }
 
+    val toolDefinitions = mutableListOf<String>()
+
+    inline fun <reified R> withTool(function: KFunction<R>): ClaudeClientBuilder {
+        val definition =
+            ToolDescription(
+                toolName = function.name,
+                description = "",
+                parameters = function.parameters.map {
+                    val claudeType = when(it.type) {
+                        typeOf<Int>()::isSupertypeOf -> "integer"
+                        typeOf<Number>()::isSupertypeOf -> "number"
+                        typeOf<Boolean>()::isSupertypeOf -> "boolean"
+                        typeOf<String>()::isSupertypeOf -> "string"
+                        else -> "string"
+                    }
+                    Parameter(
+                        name = it.name!!,
+                        type = claudeType,
+                        description = ""
+                    )
+                })
+        toolDefinitions.add(definition.toXml())
+        return this
+    }
+
     private fun validate(): List<String> {
         val errors = mutableListOf<String>()
         if (apiKey == null) {
@@ -65,7 +97,8 @@ class ClaudeClientBuilder {
                     okHttpClient = okHttpClient,
                     maxTokens = maxTokens,
                     gson = gson,
-                    systemPrompt = systemPrompt
+                    systemPrompt = systemPrompt,
+                    tools = toolDefinitions
                 )
             } ?: throw Exception("No API key provided")
         } else throw Exception(errors.joinToString())

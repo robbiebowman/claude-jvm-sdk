@@ -6,7 +6,9 @@ import com.robbiebowman.claude.Message
 import com.robbiebowman.claude.Role
 
 fun main() {
-    val claudeClient = ClaudeClientBuilder().withApiKey(System.getenv("CLAUDE_KEY")).build()
+    val claudeClient = ClaudeClientBuilder().withApiKey(System.getenv("CLAUDE_KEY"))
+        .withTool(::getCurrentMayor)
+        .build()
     val result =
         claudeClient.getChatCompletion(
             listOf(
@@ -18,4 +20,8 @@ fun main() {
             )
         )
     println(result.content.first().text)
+}
+
+fun getCurrentMayor(city: String, country: String): String {
+    return "Eric Adams"
 }
