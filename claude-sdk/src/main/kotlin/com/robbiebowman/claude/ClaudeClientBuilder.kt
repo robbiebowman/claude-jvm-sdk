@@ -13,20 +13,22 @@ import kotlin.reflect.typeOf
 class ClaudeClientBuilder {
 
     private var apiKey: String? = null
+    val toolDefinitions = mutableListOf<String>()
+    val stopSequences = mutableListOf<String>()
+    private var model: String = "claude-3-opus-20240229"
+    private var gson: Gson = Gson()
+    private var maxTokens: Int = 2048
+    private var systemPrompt: String? = null
 
     fun withApiKey(apiKey: String): ClaudeClientBuilder {
         this.apiKey = apiKey
         return this
     }
 
-    private var model: String = "claude-3-opus-20240229"
-
     fun withModel(model: String): ClaudeClientBuilder {
         this.model = model
         return this
     }
-
-    private var maxTokens: Int = 2048
 
     fun withMaxTokens(maxTokens: Int): ClaudeClientBuilder {
         this.maxTokens = maxTokens
@@ -40,21 +42,15 @@ class ClaudeClientBuilder {
         return this
     }
 
-    private var gson: Gson = Gson()
-
     fun withGson(gson: Gson): ClaudeClientBuilder {
         this.gson = gson
         return this
     }
 
-    private var systemPrompt: String? = null
-
     fun withSystemPrompt(systemPrompt: String): ClaudeClientBuilder {
         this.systemPrompt = systemPrompt
         return this
     }
-
-    val toolDefinitions = mutableListOf<String>()
 
     inline fun <reified R> withTool(function: KFunction<R>): ClaudeClientBuilder {
         val definition =
@@ -79,6 +75,11 @@ class ClaudeClientBuilder {
         return this
     }
 
+    fun withStopSequence(stopSequence: String): ClaudeClientBuilder {
+        stopSequences.add(stopSequence)
+        return this
+    }
+
     private fun validate(): List<String> {
         val errors = mutableListOf<String>()
         if (apiKey == null) {
@@ -90,6 +91,7 @@ class ClaudeClientBuilder {
     fun build(): ClaudeClient {
         val errors = validate()
         if (errors.isEmpty()) {
+            val systemPromptAndTools = toolsToSystemPrompt(systemPrompt, toolDefinitions)
             return apiKey?.let {
                 ClaudeClient(
                     apiKey = it,
@@ -97,11 +99,36 @@ class ClaudeClientBuilder {
                     okHttpClient = okHttpClient,
                     maxTokens = maxTokens,
                     gson = gson,
-                    systemPrompt = systemPrompt,
-                    tools = toolDefinitions
+                    systemPrompt = systemPromptAndTools,
+                    stopSequences = stopSequences
                 )
             } ?: throw Exception("No API key provided")
         } else throw Exception(errors.joinToString())
+    }
+
+    private fun toolsToSystemPrompt(startingPrompt: String?, tools: List<String>): String? {
+        return if (tools.isEmpty()) startingPrompt
+        else {
+            startingPrompt.orEmpty().plus(
+                """
+                In this environment you have access to a set of tools you can use to answer the user's question.
+
+                You may call them like this:
+                <function_calls>
+                <invoke>
+                <tool_name>${'$'}TOOL_NAME</tool_name>
+                <parameters>
+                <${'$'}PARAMETER_NAME>${'$'}PARAMETER_VALUE</${'$'}PARAMETER_NAME>
+                ...
+                </parameters>
+                </invoke>
+                </function_calls>
+
+                Here are the tools available:
+                
+                """.trimIndent().plus(tools.joinToString("\n\n"))
+            )
+        }
     }
 
 }

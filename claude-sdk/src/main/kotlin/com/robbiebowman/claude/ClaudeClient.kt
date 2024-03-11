@@ -15,7 +15,7 @@ class ClaudeClient internal constructor(
     private val maxTokens: Int,
     private val gson: Gson,
     private val systemPrompt: String?,
-    private val tools: List<String>
+    private val stopSequences: List<String>,
 ) {
 
     fun getChatCompletion(messages: List<Message>): ChatResponse {
