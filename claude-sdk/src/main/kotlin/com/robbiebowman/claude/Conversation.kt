@@ -41,12 +41,11 @@ class Message {
         this.images = emptyList()
     }
 
-    constructor(role: Role, message: String, images: List<Image>) {
-        this.role = role
+    constructor(message: String, images: List<Image>) {
+        this.role = Role.User
         this.message = message
         this.images = images
     }
-
 }
 
 internal data class SerializableMessage(

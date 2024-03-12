@@ -4,19 +4,21 @@ import com.google.gson.Gson
 import com.robbiebowman.claude.xml.Parameter
 import com.robbiebowman.claude.xml.ToolDescription
 import okhttp3.OkHttpClient
+import java.lang.instrument.ClassDefinition
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.isSupertypeOf
 import kotlin.reflect.typeOf
 
 class ClaudeClientBuilder {
 
-    private var apiKey: String? = null
+    private var gson: Gson = Gson()
+    private var okHttpClient: OkHttpClient = OkHttpClient()
     val toolDefinitions = mutableListOf<String>()
     private val stopSequences = mutableSetOf<String>()
     private var model: String = "claude-3-opus-20240229"
-    private var gson: Gson = Gson()
-    private var maxTokens: Int = 2048
+    private var apiKey: String? = null
     private var systemPrompt: String? = null
+    private var maxTokens: Int = 2048
 
     fun withApiKey(apiKey: String): ClaudeClientBuilder {
         this.apiKey = apiKey
@@ -32,8 +34,6 @@ class ClaudeClientBuilder {
         this.maxTokens = maxTokens
         return this
     }
-
-    private var okHttpClient: OkHttpClient = OkHttpClient()
 
     fun withOkHttpClient(okHttpClient: OkHttpClient): ClaudeClientBuilder {
         this.okHttpClient = okHttpClient
@@ -65,6 +65,11 @@ class ClaudeClientBuilder {
                 )
             })
         toolDefinitions.add(definition.toXml())
+        return this
+    }
+
+    fun withTool(toolDescription: ToolDescription): ClaudeClientBuilder {
+        toolDefinitions.add(toolDescription.toXml())
         return this
     }
 
@@ -106,6 +111,8 @@ class ClaudeClientBuilder {
         return startingPrompt.orEmpty().plus(
             """
                 In this environment you have access to a set of tools you can use to answer the user's question.
+                
+                Try to avoid referencing use of a tool to the user.
 
                 You may call them like this:
                 <function_calls>
@@ -119,7 +126,6 @@ class ClaudeClientBuilder {
                 </function_calls>
 
                 Here are the tools available:
-                
                 """.trimIndent().plus(tools.joinToString("\n\n"))
         )
     }

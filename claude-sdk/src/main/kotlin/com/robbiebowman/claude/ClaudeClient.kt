@@ -60,13 +60,11 @@ class ClaudeClient internal constructor(
             val justInvokeContent = responseMessage.substringAfter("<function_calls>")
             val invocation = xmlMapper.readValue(justInvokeContent, InvokeRequest::class.java)
             ClaudeResponse.ToolCall(
-                invocation.toolName,
-                invocation.arguments.map {
-                    ClaudeResponse.ToolCall.Argument(
-                        parameter = it.parameterName,
-                        argumentValue = it.argumentValue,
-                    )
-                })
+                toolName = invocation.toolName,
+                arguments = invocation.arguments.map {
+                    ClaudeResponse.ToolCall.Argument(it.parameterName, it.argumentValue)
+                },
+                rawMessage = responseMessage)
         } else ClaudeResponse.ChatResponse(responseMessage)
     }
 
