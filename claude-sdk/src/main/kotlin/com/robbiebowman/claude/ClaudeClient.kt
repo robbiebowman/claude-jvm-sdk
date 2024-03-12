@@ -1,8 +1,14 @@
 package com.robbiebowman.claude
 
+import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.MapperFeature
+import com.fasterxml.jackson.dataformat.xml.JacksonXmlModule
+import com.fasterxml.jackson.dataformat.xml.XmlMapper
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.google.gson.Gson
 import com.robbiebowman.claude.json.ChatRequestBody
 import com.robbiebowman.claude.json.ChatResponse
+import com.robbiebowman.claude.xml.InvokeRequest
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -15,21 +21,53 @@ class ClaudeClient internal constructor(
     private val maxTokens: Int,
     private val gson: Gson,
     private val systemPrompt: String?,
-    private val stopSequences: List<String>,
+    private val stopSequences: Set<String>,
 ) {
 
-    fun getChatCompletion(messages: List<Message>): ChatResponse {
+    private val xmlMapper = XmlMapper(JacksonXmlModule()
+        .apply { setDefaultUseWrapper(false) })
+        .registerKotlinModule()
+        .configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true)
+        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+
+    private val defaultRequest = Request.Builder()
+        .url("https://api.anthropic.com/v1/messages")
+        .header("x-api-key", apiKey)
+        .header("anthropic-version", "2023-06-01")
+        .header("content-type", "application/json")
+
+    fun getChatCompletion(messages: List<Message>): ClaudeResponse {
         val serializableMessages = messages.map { getSerializableMessage(it, okHttpClient) }
-        val requestBody = ChatRequestBody(model, maxTokens, serializableMessages, systemPrompt)
+        val requestBody = ChatRequestBody(
+            model = model,
+            maxTokens = maxTokens,
+            messages = serializableMessages,
+            system = systemPrompt,
+            stopSequence = stopSequences
+        )
         val requestJson = gson.toJson(requestBody)
-        val request = Request.Builder()
-            .post(requestJson.toRequestBody())
-            .url("https://api.anthropic.com/v1/messages")
-            .header("x-api-key", apiKey)
-            .header("anthropic-version", "2023-06-01")
-            .header("content-type", "application/json")
-        val response = okHttpClient.newCall(request.build()).execute()
-        return gson.fromJson(response.body?.string(), ChatResponse::class.java)
+        val request = defaultRequest.post(requestJson.toRequestBody()).build()
+        val rawResponse = okHttpClient.newCall(request).execute()
+        val response = gson.fromJson(rawResponse.body?.string(), ChatResponse::class.java)
+        return getClaudeResponse(response)
+    }
+
+    private fun getClaudeResponse(response: ChatResponse): ClaudeResponse {
+        val isFunctionCall = response.stopReason == "stop_sequence"
+                && response.stopSequence == "</function_calls>"
+        val responseMessage = response.content.single().text
+        return if (isFunctionCall) {
+            val justInvokeContent = responseMessage.substringAfter("<function_calls>")
+            val invocation = xmlMapper.readValue(justInvokeContent, InvokeRequest::class.java)
+            ClaudeResponse.ToolCall(
+                invocation.toolName,
+                invocation.arguments.map {
+                    ClaudeResponse.ToolCall.Argument(
+                        parameter = it.parameterName,
+                        argumentValue = it.argumentValue,
+                    )
+                })
+        } else ClaudeResponse.ChatResponse(responseMessage)
     }
 
     private fun getSerializableMessage(message: Message, okHttpClient: OkHttpClient): SerializableMessage {

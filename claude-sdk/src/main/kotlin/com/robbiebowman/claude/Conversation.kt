@@ -60,7 +60,7 @@ internal sealed class MessageContent(val type: String) {
     class ImageContent(val source: ResolvedImageContent) : MessageContent("image")
 }
 
-data class ResolvedImageContent(
+internal data class ResolvedImageContent(
     val data: String,
     @SerializedName("media_type") val mediaType: String
 ) {

@@ -1,9 +1,6 @@
 package com.robbiebowman.test
 
-import com.robbiebowman.claude.ClaudeClientBuilder
-import com.robbiebowman.claude.Image
-import com.robbiebowman.claude.Message
-import com.robbiebowman.claude.Role
+import com.robbiebowman.claude.*
 
 fun main() {
     val claudeClient = ClaudeClientBuilder().withApiKey(System.getenv("CLAUDE_KEY"))
@@ -14,12 +11,14 @@ fun main() {
             listOf(
                 Message(
                     Role.User,
-                    "What is this a picture of?",
-                    listOf(Image("https://media.npr.org/images/stations/nprone_logos/wnyc.png"))
+                    "Who is the mayor of New York??"
                 )
             )
         )
-    println(result.content.first().text)
+    when (result) {
+        is ClaudeResponse.ChatResponse -> println("Claude: ${result.message}")
+        is ClaudeResponse.ToolCall -> println("${result.toolName}(${result.arguments.joinToString()})")
+    }
 }
 
 fun getCurrentMayor(city: String, country: String): String {

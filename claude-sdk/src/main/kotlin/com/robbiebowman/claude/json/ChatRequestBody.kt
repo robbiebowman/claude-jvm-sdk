@@ -8,5 +8,7 @@ internal data class ChatRequestBody(
     @SerializedName("max_tokens")
     val maxTokens: Int,
     val messages: List<SerializableMessage>,
-    val system: String?
+    val system: String?,
+    @SerializedName("stop_sequences")
+    val stopSequence: Set<String>
 )

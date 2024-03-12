@@ -3,10 +3,8 @@ package com.robbiebowman.claude
 import com.google.gson.Gson
 import com.robbiebowman.claude.xml.Parameter
 import com.robbiebowman.claude.xml.ToolDescription
-import jdk.jfr.Description
 import okhttp3.OkHttpClient
 import kotlin.reflect.KFunction
-import kotlin.reflect.KType
 import kotlin.reflect.full.isSupertypeOf
 import kotlin.reflect.typeOf
 
@@ -14,7 +12,7 @@ class ClaudeClientBuilder {
 
     private var apiKey: String? = null
     val toolDefinitions = mutableListOf<String>()
-    val stopSequences = mutableListOf<String>()
+    private val stopSequences = mutableSetOf<String>()
     private var model: String = "claude-3-opus-20240229"
     private var gson: Gson = Gson()
     private var maxTokens: Int = 2048
@@ -54,23 +52,18 @@ class ClaudeClientBuilder {
 
     inline fun <reified R> withTool(function: KFunction<R>): ClaudeClientBuilder {
         val definition =
-            ToolDescription(
-                toolName = function.name,
-                description = "",
-                parameters = function.parameters.map {
-                    val claudeType = when(it.type) {
-                        typeOf<Int>()::isSupertypeOf -> "integer"
-                        typeOf<Number>()::isSupertypeOf -> "number"
-                        typeOf<Boolean>()::isSupertypeOf -> "boolean"
-                        typeOf<String>()::isSupertypeOf -> "string"
-                        else -> "string"
-                    }
-                    Parameter(
-                        name = it.name!!,
-                        type = claudeType,
-                        description = ""
-                    )
-                })
+            ToolDescription(toolName = function.name, description = "", parameters = function.parameters.map {
+                val claudeType = when (it.type) {
+                    typeOf<Int>()::isSupertypeOf -> "integer"
+                    typeOf<Number>()::isSupertypeOf -> "number"
+                    typeOf<Boolean>()::isSupertypeOf -> "boolean"
+                    typeOf<String>()::isSupertypeOf -> "string"
+                    else -> "string"
+                }
+                Parameter(
+                    name = it.name!!, type = claudeType, description = ""
+                )
+            })
         toolDefinitions.add(definition.toXml())
         return this
     }
@@ -91,7 +84,10 @@ class ClaudeClientBuilder {
     fun build(): ClaudeClient {
         val errors = validate()
         if (errors.isEmpty()) {
-            val systemPromptAndTools = toolsToSystemPrompt(systemPrompt, toolDefinitions)
+            val systemPromptAndTools = if (toolDefinitions.isNotEmpty()) {
+                stopSequences.add("</function_calls>")
+                toolsToSystemPrompt(systemPrompt, toolDefinitions)
+            } else systemPrompt
             return apiKey?.let {
                 ClaudeClient(
                     apiKey = it,
@@ -107,10 +103,8 @@ class ClaudeClientBuilder {
     }
 
     private fun toolsToSystemPrompt(startingPrompt: String?, tools: List<String>): String? {
-        return if (tools.isEmpty()) startingPrompt
-        else {
-            startingPrompt.orEmpty().plus(
-                """
+        return startingPrompt.orEmpty().plus(
+            """
                 In this environment you have access to a set of tools you can use to answer the user's question.
 
                 You may call them like this:
@@ -127,8 +121,7 @@ class ClaudeClientBuilder {
                 Here are the tools available:
                 
                 """.trimIndent().plus(tools.joinToString("\n\n"))
-            )
-        }
+        )
     }
 
 }

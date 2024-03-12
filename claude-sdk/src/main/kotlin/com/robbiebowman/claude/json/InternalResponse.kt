@@ -1,22 +1,26 @@
 package com.robbiebowman.claude.json
 
-data class ChatResponse(
+import com.google.gson.annotations.SerializedName
+
+internal data class ChatResponse(
     val id: String,
     val type: String,
     val role: String,
     val content: List<ContentItem>,
     val model: String,
-    val stopReason: String,
+    @SerializedName("stop_reason")
+    val stopReason: String?,
+    @SerializedName("stop_sequence")
     val stopSequence: String?,
     val usage: Usage
 )
 
-data class ContentItem(
+internal data class ContentItem(
     val type: String,
     val text: String
 )
 
-data class Usage(
+internal data class Usage(
     val inputTokens: Int,
     val outputTokens: Int
 )
