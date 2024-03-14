@@ -3,7 +3,9 @@ package com.robbiebowman.test
 import com.robbiebowman.claude.*
 
 fun main() {
-    val claudeClient = ClaudeClientBuilder().withApiKey(System.getenv("CLAUDE_KEY"))
+    val claudeClient = ClaudeClientBuilder()
+        .withApiKey(System.getenv("CLAUDE_KEY"))
+        .withModel(ClaudeModel.Haiku)
         .withTool(::getCurrentMayor)
         .build()
     val messages = mutableListOf(Message(Role.User, "Who is the mayor of New York??"),)

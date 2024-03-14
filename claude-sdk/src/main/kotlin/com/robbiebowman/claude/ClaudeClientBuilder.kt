@@ -30,6 +30,11 @@ class ClaudeClientBuilder {
         return this
     }
 
+    fun withModel(model: ClaudeModel): ClaudeClientBuilder {
+        this.model = model.spec
+        return this
+    }
+
     fun withMaxTokens(maxTokens: Int): ClaudeClientBuilder {
         this.maxTokens = maxTokens
         return this
