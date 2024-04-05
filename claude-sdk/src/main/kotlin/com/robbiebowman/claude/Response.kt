@@ -12,7 +12,7 @@ sealed class ClaudeResponse {
 
     class ToolCall internal constructor(
         val toolName: String,
-        val arguments: List<Argument>,
+        val arguments: Map<String, String>,
         private val rawMessage: String
     ) : ClaudeResponse() {
 

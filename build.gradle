@@ -7,8 +7,7 @@ plugins {
 }
 
 allprojects {
-    group = 'com.robbiebowman'
-    version = '1.0-SNAPSHOT'
+
 
     repositories {
         mavenCentral()

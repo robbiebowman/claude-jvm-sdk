@@ -14,20 +14,14 @@ internal data class InvokeRequest(
 
     @JacksonXmlProperty(localName = "parameters")
     @JsonDeserialize(using = InfoDeserializer::class)
-    val arguments: List<Argument>
+    val arguments: Map<String, String>
 )
 
-data class Argument(
-    val parameterName: String,
-    val argumentValue: String
-)
-
-
-class InfoDeserializer : JsonDeserializer<List<Argument>>() {
-    override fun deserialize(p: JsonParser, ctxt: DeserializationContext): List<Argument> {
+class InfoDeserializer : JsonDeserializer<Map<String, String>>() {
+    override fun deserialize(p: JsonParser, ctxt: DeserializationContext): Map<String, String> {
         val currentNode = p.codec.readTree<ObjectNode>(p)
         val fieldName = currentNode.fieldNames().next()
         val props = currentNode.get(fieldName).properties()
-        return props.map { (key, value) -> Argument(key, value.asText()) }
+        return props.associate { (key, value) -> key to value.asText() }
     }
 }

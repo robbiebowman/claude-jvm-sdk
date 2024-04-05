@@ -4,6 +4,12 @@ import com.google.gson.annotations.SerializedName
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
+/**
+ * Role represents the author of a message. Claude's messages and tool calls will be Assistant. User responses and tool
+ * results will be User.
+ *
+ * The messages API will reject completion requests with messages from the same Role twice in a row.
+ */
 enum class Role {
     @SerializedName("user")
     User,
@@ -12,6 +18,11 @@ enum class Role {
     Assistant
 }
 
+/**
+ * An image to be included in a Message. Can be either the base64 encoded bytes or a publicly accessible url to an image.
+ * The OkHttpClient in the ClaudeClient will resolve image urls before sending to Claude.
+ *
+ */
 class Image {
     internal val imageUrl: String?
     internal val imageContents: ByteArray?
@@ -30,6 +41,11 @@ class Image {
     }
 }
 
+/**
+ * Messages represent non-tool call responses, and user inputs for Claude.
+ *
+ * They can include an arbitrary number of images.
+ */
 class Message {
     internal val role: Role
     internal val message: String

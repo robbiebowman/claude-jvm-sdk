@@ -16,8 +16,8 @@ fun main() {
             // Add Claude's response
             messages.add(claudeResponse.toMessage())
 
-            val city = claudeResponse.arguments.first{ it.parameter == "city" }.argumentValue
-            val country = claudeResponse.arguments.first{ it.parameter == "country" }.argumentValue
+            val city = claudeResponse.arguments["city"]
+            val country = claudeResponse.arguments["country"]
             val functionResult = getCurrentMayor(city, country)
 
             // Tell Claude our function's result
@@ -30,6 +30,6 @@ fun main() {
     }
 }
 
-fun getCurrentMayor(city: String, country: String): String {
+fun getCurrentMayor(city: String?, country: String?): String {
     return "Eric Adams"
 }

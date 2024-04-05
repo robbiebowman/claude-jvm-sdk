@@ -1,6 +1,8 @@
+import com.vanniktech.maven.publish.SonatypeHost
+
 plugins {
     id 'org.jetbrains.kotlin.jvm'
-    id 'maven-publish'
+    id "com.vanniktech.maven.publish" version "0.28.0"
 }
 
 dependencies {
@@ -13,13 +15,39 @@ dependencies {
     testImplementation 'org.jetbrains.kotlin:kotlin-test'
 }
 
-publishing {
-    publications {
-        maven(MavenPublication) {
-            groupId project.group
-            artifactId project.name
-            version project.version
-            from components.java
+compileKotlin {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+mavenPublishing {
+    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+    signAllPublications()
+
+    coordinates("com.robbiebowman", "claude-sdk", "0.0.1b")
+
+    pom {
+        name = 'Claude SDK'
+        description = 'An SDK for using Anthropic\'s Claude API. Includes support for images, and conversion of lambda references into Claude Tools.'
+        inceptionYear = "2024"
+        url = 'https://github.com/robbiebowman/claude-jvm-sdk/'
+        licenses {
+            license {
+                name = 'The Apache License, Version 2.0'
+                url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+            }
+        }
+        developers {
+            developer {
+                id = 'developerId'
+                name = 'Robbie Bowman'
+                email = 'robbiebowman@gmail.com'
+            }
+        }
+        scm {
+            connection = 'scm:git:git://github.com/robbiebowman/claude-jvm-sdk.git'
+            developerConnection = 'scm:git:ssh://github.com:robbiebowman/claude-jvm-sdk.git'
+            url = 'https://github.com/robbiebowman/claude-jvm-sdk/'
         }
     }
 }
