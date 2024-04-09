@@ -8,7 +8,6 @@ plugins {
 
 allprojects {
 
-
     repositories {
         mavenCentral()
         gradlePluginPortal()
@@ -19,6 +18,6 @@ allprojects {
     }
 
     tasks.withType(KotlinCompile).configureEach {
-        kotlinOptions.jvmTarget = '1.8'
+        kotlinOptions.jvmTarget = '17'
     }
 }

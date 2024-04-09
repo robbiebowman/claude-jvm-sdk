@@ -1,13 +1,16 @@
 package com.robbiebowman.claude
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.jsonSchema.JsonSchema
+import com.fasterxml.jackson.module.jsonSchema.JsonSchemaGenerator
 import com.google.gson.Gson
-import com.robbiebowman.claude.xml.Parameter
-import com.robbiebowman.claude.xml.ToolDescription
+import com.robbiebowman.claude.json.Tool
 import okhttp3.OkHttpClient
-import java.lang.instrument.ClassDefinition
+import kotlin.reflect.KAnnotatedElement
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.isSupertypeOf
 import kotlin.reflect.typeOf
+
 
 /**
  * Claude client builder
@@ -110,31 +113,41 @@ class ClaudeClientBuilder {
      * @return This instance of the client build with the new value
      */
     inline fun <reified R> withTool(function: KFunction<R>): ClaudeClientBuilder {
+        val description = getToolDescription(function)
+        val mapper = ObjectMapper()
+
+        // configure mapper, if necessary, then create schema generator
+        val schemaGen = JsonSchemaGenerator(mapper)
+        val schema: JsonSchema = schemaGen.generateSchema(R::class.java)
         val definition =
-            ToolDescription(toolName = function.name, description = "", parameters = function.parameters.map {
-                val claudeType = when (it.type) {
-                    typeOf<Int>()::isSupertypeOf -> "integer"
-                    typeOf<Number>()::isSupertypeOf -> "number"
-                    typeOf<Boolean>()::isSupertypeOf -> "boolean"
-                    typeOf<String>()::isSupertypeOf -> "string"
-                    else -> "string"
-                }
-                Parameter(
-                    name = it.name!!, type = claudeType, description = ""
-                )
-            })
-        toolDefinitions.add(definition.toXml())
+            Tool(
+                toolName = function.name,
+                description = description ?: "",
+                parameters = function.parameters.map {
+                    val toolDescription = getToolDescription(it)
+                    val claudeType = when (it.type) {
+                        typeOf<Int>()::isSupertypeOf -> "integer"
+                        typeOf<Number>()::isSupertypeOf -> "number"
+                        typeOf<Boolean>()::isSupertypeOf -> "boolean"
+                        typeOf<String>()::isSupertypeOf -> "string"
+                        else -> "object"
+                    }
+                    Tool.Parameter(
+                        name = it.name!!, type = claudeType, description = toolDescription ?: ""
+                    )
+                })
+        toolDefinitions.add("definition.toJson()")
         return this
     }
 
     /**
      * Adds a tool/function via explicit definition
      *
-     * @param toolDescription
+     * @param tool
      * @return This instance of the client build with the new value
      */
-    fun withTool(toolDescription: ToolDescription): ClaudeClientBuilder {
-        toolDefinitions.add(toolDescription.toXml())
+    fun withTool(tool: Tool): ClaudeClientBuilder {
+        toolDefinitions.add("tool.toXml()")
         return this
     }
 
@@ -151,7 +164,7 @@ class ClaudeClientBuilder {
     }
 
     /**
-     * Builds the client 
+     * Builds the client
      *
      * @return A client with the configured values
      */
@@ -205,6 +218,12 @@ class ClaudeClientBuilder {
                 Here are the tools available:
                 """.trimIndent().plus(tools.joinToString("\n\n"))
         )
+    }
+
+    fun getToolDescription(annotated: KAnnotatedElement): String? {
+        val annotation =
+            annotated.annotations.firstOrNull { it is com.robbiebowman.claude.ToolDescription } as com.robbiebowman.claude.ToolDescription?
+        return annotation?.value
     }
 
 }
