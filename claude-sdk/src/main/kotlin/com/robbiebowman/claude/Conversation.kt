@@ -1,6 +1,10 @@
 package com.robbiebowman.claude
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.annotation.JsonSubTypes
+import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.google.gson.annotations.SerializedName
+import kotlin.reflect.KClass
 
 /**
  * Role represents the author of a message. Claude's messages and tool calls will be Assistant. User responses and tool
@@ -44,6 +48,14 @@ data class SerializableMessage(
     val content: List<MessageContent>
 )
 
+@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY)
+@JsonSubTypes(
+    JsonSubTypes.Type(value = MessageContent.TextContent::class, name = "TextContent"),
+    JsonSubTypes.Type(value = MessageContent.ImageContent::class, name = "ImageContent"),
+    JsonSubTypes.Type(value = MessageContent.ToolUse::class, name = "ToolUse"),
+    JsonSubTypes.Type(value = MessageContent.ToolResult::class, name = "ToolResult")
+)
 sealed class MessageContent(val type: String) {
     class TextContent(val text: String) : MessageContent("text")
 

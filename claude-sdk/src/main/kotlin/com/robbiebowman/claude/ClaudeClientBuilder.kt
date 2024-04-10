@@ -2,6 +2,9 @@ package com.robbiebowman.claude
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.jsonSchema.JsonSchemaGenerator
+import com.fasterxml.jackson.module.jsonSchema.types.ArraySchema
+import com.fasterxml.jackson.module.jsonSchema.types.ObjectSchema
+import com.fasterxml.jackson.module.jsonSchema.types.StringSchema
 import com.google.gson.Gson
 import com.robbiebowman.claude.json.JsonSchemaTool
 import okhttp3.OkHttpClient
@@ -120,14 +123,17 @@ class ClaudeClientBuilder {
             val schema = schemaGenerator.generateSchema(type).apply {
                 id = null
                 description = toolDescription
+                required = true
             }
-            it.name to schema
+            it.name!! to schema
         }
         val definition = JsonSchemaTool(
-                name = function.name,
-                description = getToolDescription(function),
-                parameters = paramSchema
-            )
+            name = function.name,
+            description = getToolDescription(function),
+            input_schema = ObjectSchema().apply {
+                properties = paramSchema
+            }
+        )
         toolDefinitions.add(mapper.writeValueAsString(definition))
         return this
     }
