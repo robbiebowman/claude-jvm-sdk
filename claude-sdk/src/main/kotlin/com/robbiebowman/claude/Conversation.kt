@@ -1,8 +1,6 @@
 package com.robbiebowman.claude
 
 import com.google.gson.annotations.SerializedName
-import okhttp3.OkHttpClient
-import okhttp3.Request
 
 /**
  * Role represents the author of a message. Claude's messages and tool calls will be Assistant. User responses and tool
@@ -41,41 +39,25 @@ class Image {
     }
 }
 
-/**
- * Messages represent non-tool call responses, and user inputs for Claude.
- *
- * They can include an arbitrary number of images.
- */
-class Message {
-    internal val role: Role
-    internal val message: String
-    internal val images: List<Image>
-
-    constructor(role: Role, message: String) {
-        this.role = role
-        this.message = message
-        this.images = emptyList()
-    }
-
-    constructor(message: String, images: List<Image>) {
-        this.role = Role.User
-        this.message = message
-        this.images = images
-    }
-}
-
-internal data class SerializableMessage(
+data class SerializableMessage(
     val role: Role,
     val content: List<MessageContent>
 )
 
-internal sealed class MessageContent(val type: String) {
+sealed class MessageContent(val type: String) {
     class TextContent(val text: String) : MessageContent("text")
 
     class ImageContent(val source: ResolvedImageContent) : MessageContent("image")
+
+    class ToolUse(val id: String, val name: String, val input: Map<String, String>) : MessageContent("tool_use")
+
+    class ToolResult(
+        @SerializedName("tool_use_id") val toolUseId: String,
+        val content: String?
+    ) : MessageContent("tool_result")
 }
 
-internal data class ResolvedImageContent(
+data class ResolvedImageContent(
     val data: String,
     @SerializedName("media_type") val mediaType: String
 ) {

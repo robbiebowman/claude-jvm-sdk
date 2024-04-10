@@ -15,7 +15,7 @@ fun main() {
 
             val city = claudeResponse.arguments["city"]
             val country = claudeResponse.arguments["country"]
-            val functionResult = getCurrentMayor(city, country)
+            val functionResult = getCurrentMayor(city, country, SomeNesting(1, Location.London))
 
             // Tell Claude our function's result
             messages.add(claudeResponse.toResult(functionResult))
@@ -30,7 +30,17 @@ fun main() {
 @ToolDescription("Gets the current mayor of a given city")
 fun getCurrentMayor(
     @ToolDescription("The city whose mayor to find") city: String?,
-    @ToolDescription("The country of the city, in case there's ambiguity of the city's name") country: String?
+    @ToolDescription("The country of the city, in case there's ambiguity of the city's name") country: String?,
+    misc: SomeNesting
 ): String {
     return "Eric Adams"
+}
+
+data class SomeNesting(
+    val temp: Int,
+    val location: Location
+)
+
+enum class Location {
+    Paris, NewYork, London;
 }

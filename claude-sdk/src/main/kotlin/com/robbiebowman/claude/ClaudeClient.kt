@@ -8,6 +8,7 @@ import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.google.gson.Gson
 import com.robbiebowman.claude.json.ChatRequestBody
 import com.robbiebowman.claude.json.ChatResponse
+import com.robbiebowman.claude.json.ContentItem
 import com.robbiebowman.claude.xml.InvokeRequest
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -22,6 +23,7 @@ class ClaudeClient internal constructor(
     private val gson: Gson,
     private val systemPrompt: String?,
     private val stopSequences: Set<String>,
+    private val tools: List<String>,
 ) {
 
     private val xmlMapper = XmlMapper(JacksonXmlModule()
@@ -43,7 +45,8 @@ class ClaudeClient internal constructor(
             maxTokens = maxTokens,
             messages = serializableMessages,
             system = systemPrompt,
-            stopSequence = stopSequences
+            stopSequence = stopSequences,
+            tools = tools
         )
         val requestJson = gson.toJson(requestBody)
         val request = defaultRequest.post(requestJson.toRequestBody()).build()
@@ -53,17 +56,14 @@ class ClaudeClient internal constructor(
     }
 
     private fun getClaudeResponse(response: ChatResponse): ClaudeResponse {
-        val isFunctionCall = response.stopReason == "stop_sequence"
-                && response.stopSequence == "</function_calls>"
-        val responseMessage = response.content.single().text
-        return if (isFunctionCall) {
-            val justInvokeContent = responseMessage.substringAfter("<function_calls>")
-            val invocation = xmlMapper.readValue(justInvokeContent, InvokeRequest::class.java)
+        val toolCall = response.content.firstOrNull { it.type == ContentItem.Type.ToolUse.jsonText }
+        return if (toolCall != null) {
             ClaudeResponse.ToolCall(
-                toolName = invocation.toolName,
-                arguments = invocation.arguments,
-                rawMessage = responseMessage)
-        } else ClaudeResponse.ChatResponse(responseMessage)
+                id = toolCall.id!!,
+                toolName = toolCall.name!!,
+                arguments = toolCall.input!!,
+            )
+        } else ClaudeResponse.ChatResponse(response.content.single().text!!)
     }
 
     private fun getSerializableMessage(message: Message, okHttpClient: OkHttpClient): SerializableMessage {

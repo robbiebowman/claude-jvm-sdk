@@ -11,13 +11,13 @@ sealed class ClaudeResponse {
     }
 
     class ToolCall internal constructor(
+        private val id: String,
         val toolName: String,
         val arguments: Map<String, String>,
-        private val rawMessage: String
     ) : ClaudeResponse() {
 
         override fun toMessage(): Message {
-            return Message(Role.Assistant, rawMessage)
+            return Message(Role.Assistant)
         }
 
         data class Argument internal constructor(val parameter: String, val argumentValue: String)

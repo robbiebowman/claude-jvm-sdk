@@ -1,15 +1,13 @@
 package com.robbiebowman.claude
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.jsonSchema.JsonSchema
 import com.fasterxml.jackson.module.jsonSchema.JsonSchemaGenerator
 import com.google.gson.Gson
-import com.robbiebowman.claude.json.Tool
+import com.robbiebowman.claude.json.JsonSchemaTool
 import okhttp3.OkHttpClient
 import kotlin.reflect.KAnnotatedElement
 import kotlin.reflect.KFunction
-import kotlin.reflect.full.isSupertypeOf
-import kotlin.reflect.typeOf
+import kotlin.reflect.javaType
 
 
 /**
@@ -22,6 +20,8 @@ class ClaudeClientBuilder {
     private var gson: Gson = Gson()
     private var okHttpClient: OkHttpClient = OkHttpClient()
     val toolDefinitions = mutableListOf<String>()
+    val mapper = ObjectMapper()
+    val schemaGenerator = JsonSchemaGenerator(mapper)
     private val stopSequences = mutableSetOf<String>()
     private var model: String = "claude-3-opus-20240229"
     private var apiKey: String? = null
@@ -112,31 +112,23 @@ class ClaudeClientBuilder {
      * @param function
      * @return This instance of the client build with the new value
      */
-    inline fun <reified R> withTool(function: KFunction<R>): ClaudeClientBuilder {
-        val description = getToolDescription(function)
-        val mapper = ObjectMapper()
-
-        // configure mapper, if necessary, then create schema generator
-        val schemaGen = JsonSchemaGenerator(mapper)
-        val schema: JsonSchema = schemaGen.generateSchema(R::class.java)
-        val definition =
-            Tool(
-                toolName = function.name,
-                description = description ?: "",
-                parameters = function.parameters.map {
-                    val toolDescription = getToolDescription(it)
-                    val claudeType = when (it.type) {
-                        typeOf<Int>()::isSupertypeOf -> "integer"
-                        typeOf<Number>()::isSupertypeOf -> "number"
-                        typeOf<Boolean>()::isSupertypeOf -> "boolean"
-                        typeOf<String>()::isSupertypeOf -> "string"
-                        else -> "object"
-                    }
-                    Tool.Parameter(
-                        name = it.name!!, type = claudeType, description = toolDescription ?: ""
-                    )
-                })
-        toolDefinitions.add("definition.toJson()")
+    @OptIn(ExperimentalStdlibApi::class)
+    fun withTool(function: KFunction<*>): ClaudeClientBuilder {
+        val paramSchema = function.parameters.associate {
+            val toolDescription = getToolDescription(it)
+            val type = mapper.typeFactory.constructType(it.type.javaType)
+            val schema = schemaGenerator.generateSchema(type).apply {
+                id = null
+                description = toolDescription
+            }
+            it.name to schema
+        }
+        val definition = JsonSchemaTool(
+                name = function.name,
+                description = getToolDescription(function),
+                parameters = paramSchema
+            )
+        toolDefinitions.add(mapper.writeValueAsString(definition))
         return this
     }
 
@@ -146,7 +138,7 @@ class ClaudeClientBuilder {
      * @param tool
      * @return This instance of the client build with the new value
      */
-    fun withTool(tool: Tool): ClaudeClientBuilder {
+    fun withTool(tool: JsonSchemaTool): ClaudeClientBuilder {
         toolDefinitions.add("tool.toXml()")
         return this
     }
@@ -171,10 +163,6 @@ class ClaudeClientBuilder {
     fun build(): ClaudeClient {
         val errors = validate()
         if (errors.isEmpty()) {
-            val systemPromptAndTools = if (toolDefinitions.isNotEmpty()) {
-                stopSequences.add("</function_calls>")
-                toolsToSystemPrompt(systemPrompt, toolDefinitions)
-            } else systemPrompt
             return apiKey?.let {
                 ClaudeClient(
                     apiKey = it,
@@ -182,8 +170,9 @@ class ClaudeClientBuilder {
                     okHttpClient = okHttpClient,
                     maxTokens = maxTokens,
                     gson = gson,
-                    systemPrompt = systemPromptAndTools,
-                    stopSequences = stopSequences
+                    systemPrompt = systemPrompt,
+                    stopSequences = stopSequences,
+                    tools = toolDefinitions
                 )
             } ?: throw Exception("No API key provided")
         } else throw Exception(errors.joinToString())
