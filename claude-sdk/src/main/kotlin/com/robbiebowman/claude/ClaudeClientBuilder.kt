@@ -1,13 +1,22 @@
 package com.robbiebowman.claude
 
-import com.google.gson.Gson
-import com.robbiebowman.claude.xml.Parameter
-import com.robbiebowman.claude.xml.ToolDescription
+import com.fasterxml.jackson.annotation.JsonFilter
+import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.PropertyNamingStrategies
+import com.fasterxml.jackson.databind.ser.impl.SimpleBeanPropertyFilter
+import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider
+import com.fasterxml.jackson.module.jsonSchema.JsonSchema
+import com.fasterxml.jackson.module.jsonSchema.JsonSchemaGenerator
+import com.fasterxml.jackson.module.jsonSchema.types.ObjectSchema
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.robbiebowman.claude.json.IgnoreRequiredFieldFilter
+import com.robbiebowman.claude.json.JsonSchemaTool
 import okhttp3.OkHttpClient
-import java.lang.instrument.ClassDefinition
+import kotlin.reflect.KAnnotatedElement
 import kotlin.reflect.KFunction
-import kotlin.reflect.full.isSupertypeOf
-import kotlin.reflect.typeOf
+import kotlin.reflect.javaType
 
 /**
  * Claude client builder
@@ -16,9 +25,16 @@ import kotlin.reflect.typeOf
  */
 class ClaudeClientBuilder {
 
-    private var gson: Gson = Gson()
     private var okHttpClient: OkHttpClient = OkHttpClient()
-    val toolDefinitions = mutableListOf<String>()
+    val toolDefinitions = mutableListOf<JsonSchemaTool>()
+    private var mapper = jacksonObjectMapper().apply {
+        propertyNamingStrategy = PropertyNamingStrategies.SNAKE_CASE
+        setSerializationInclusion(JsonInclude.Include.NON_NULL)
+        configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+        addMixIn(JsonSchema::class.java, IgnoreRequiredFieldFilter::class.java)
+        setFilterProvider(IgnoreRequiredFieldFilter.provider)
+    }
+    private var schemaGenerator = JsonSchemaGenerator(mapper)
     private val stopSequences = mutableSetOf<String>()
     private var model: String = "claude-3-opus-20240229"
     private var apiKey: String? = null
@@ -81,13 +97,14 @@ class ClaudeClientBuilder {
     }
 
     /**
-     * Sets a custom gson parser.
+     * Sets a custom jackson parser.
      *
      * @param gson
      * @return This instance of the client build with the new value
      */
-    fun withGson(gson: Gson): ClaudeClientBuilder {
-        this.gson = gson
+    fun withMapper(mapper: ObjectMapper): ClaudeClientBuilder {
+        this.mapper = mapper
+        schemaGenerator = JsonSchemaGenerator(mapper)
         return this
     }
 
@@ -109,32 +126,25 @@ class ClaudeClientBuilder {
      * @param function
      * @return This instance of the client build with the new value
      */
-    inline fun <reified R> withTool(function: KFunction<R>): ClaudeClientBuilder {
-        val definition =
-            ToolDescription(toolName = function.name, description = "", parameters = function.parameters.map {
-                val claudeType = when (it.type) {
-                    typeOf<Int>()::isSupertypeOf -> "integer"
-                    typeOf<Number>()::isSupertypeOf -> "number"
-                    typeOf<Boolean>()::isSupertypeOf -> "boolean"
-                    typeOf<String>()::isSupertypeOf -> "string"
-                    else -> "string"
-                }
-                Parameter(
-                    name = it.name!!, type = claudeType, description = ""
-                )
-            })
-        toolDefinitions.add(definition.toXml())
-        return this
-    }
-
-    /**
-     * Adds a tool/function via explicit definition
-     *
-     * @param toolDescription
-     * @return This instance of the client build with the new value
-     */
-    fun withTool(toolDescription: ToolDescription): ClaudeClientBuilder {
-        toolDefinitions.add(toolDescription.toXml())
+    @OptIn(ExperimentalStdlibApi::class)
+    fun withTool(function: KFunction<*>): ClaudeClientBuilder {
+        val paramSchema = function.parameters.associate {
+            val toolDescription = getToolDescription(it)
+            val type = mapper.typeFactory.constructType(it.type.javaType)
+            val schema = schemaGenerator.generateSchema(type).apply {
+                id = null
+                description = toolDescription
+            }
+            it.name!! to schema
+        }
+        val definition = JsonSchemaTool(
+            name = function.name,
+            description = getToolDescription(function),
+            input_schema = ObjectSchema().apply {
+                properties = paramSchema
+            }
+        )
+        toolDefinitions.add(definition)
         return this
     }
 
@@ -151,26 +161,23 @@ class ClaudeClientBuilder {
     }
 
     /**
-     * Builds the client 
+     * Builds the client
      *
      * @return A client with the configured values
      */
     fun build(): ClaudeClient {
         val errors = validate()
         if (errors.isEmpty()) {
-            val systemPromptAndTools = if (toolDefinitions.isNotEmpty()) {
-                stopSequences.add("</function_calls>")
-                toolsToSystemPrompt(systemPrompt, toolDefinitions)
-            } else systemPrompt
             return apiKey?.let {
                 ClaudeClient(
                     apiKey = it,
                     model = model,
                     okHttpClient = okHttpClient,
                     maxTokens = maxTokens,
-                    gson = gson,
-                    systemPrompt = systemPromptAndTools,
-                    stopSequences = stopSequences
+                    mapper = mapper,
+                    systemPrompt = systemPrompt,
+                    stopSequences = stopSequences,
+                    tools = toolDefinitions
                 )
             } ?: throw Exception("No API key provided")
         } else throw Exception(errors.joinToString())
@@ -184,27 +191,10 @@ class ClaudeClientBuilder {
         return errors
     }
 
-    private fun toolsToSystemPrompt(startingPrompt: String?, tools: List<String>): String? {
-        return startingPrompt.orEmpty().plus(
-            """
-                In this environment you have access to a set of tools you can use to answer the user's question.
-                
-                Try to avoid referencing use of a tool to the user.
-
-                You may call them like this:
-                <function_calls>
-                <invoke>
-                <tool_name>${'$'}TOOL_NAME</tool_name>
-                <parameters>
-                <${'$'}PARAMETER_NAME>${'$'}PARAMETER_VALUE</${'$'}PARAMETER_NAME>
-                ...
-                </parameters>
-                </invoke>
-                </function_calls>
-
-                Here are the tools available:
-                """.trimIndent().plus(tools.joinToString("\n\n"))
-        )
+    private fun getToolDescription(annotated: KAnnotatedElement): String? {
+        val annotation =
+            annotated.annotations.firstOrNull { it is ToolDescription } as ToolDescription?
+        return annotation?.value
     }
 
 }

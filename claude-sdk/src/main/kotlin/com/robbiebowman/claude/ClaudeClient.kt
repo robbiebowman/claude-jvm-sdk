@@ -1,81 +1,44 @@
 package com.robbiebowman.claude
 
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.MapperFeature
-import com.fasterxml.jackson.dataformat.xml.JacksonXmlModule
-import com.fasterxml.jackson.dataformat.xml.XmlMapper
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
-import com.google.gson.Gson
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.robbiebowman.claude.json.ChatRequestBody
-import com.robbiebowman.claude.json.ChatResponse
-import com.robbiebowman.claude.xml.InvokeRequest
+import com.robbiebowman.claude.json.JsonSchemaTool
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.*
 
 class ClaudeClient internal constructor(
     private val apiKey: String,
     private val model: String,
     private val okHttpClient: OkHttpClient,
     private val maxTokens: Int,
-    private val gson: Gson,
+    private val mapper: ObjectMapper,
     private val systemPrompt: String?,
     private val stopSequences: Set<String>,
+    private val tools: List<JsonSchemaTool>,
 ) {
-
-    private val xmlMapper = XmlMapper(JacksonXmlModule()
-        .apply { setDefaultUseWrapper(false) })
-        .registerKotlinModule()
-        .configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true)
-        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
 
     private val defaultRequest = Request.Builder()
         .url("https://api.anthropic.com/v1/messages")
+        .header("content-type", "application/json")
         .header("x-api-key", apiKey)
         .header("anthropic-version", "2023-06-01")
-        .header("content-type", "application/json")
+        .header("anthropic-beta", "tools-2024-04-04")
 
-    fun getChatCompletion(messages: List<Message>): ClaudeResponse {
-        val serializableMessages = messages.map { getSerializableMessage(it, okHttpClient) }
+    fun getChatCompletion(messages: List<SerializableMessage>): SerializableMessage {
         val requestBody = ChatRequestBody(
             model = model,
             maxTokens = maxTokens,
-            messages = serializableMessages,
-            system = systemPrompt,
-            stopSequence = stopSequences
+            messages = messages,
+            system = systemPrompt ?: "",
+            stopSequence = stopSequences,
+            tools = tools
         )
-        val requestJson = gson.toJson(requestBody)
+        val requestJson = mapper.writeValueAsString(requestBody)
         val request = defaultRequest.post(requestJson.toRequestBody()).build()
         val rawResponse = okHttpClient.newCall(request).execute()
-        val response = gson.fromJson(rawResponse.body?.string(), ChatResponse::class.java)
-        return getClaudeResponse(response)
-    }
-
-    private fun getClaudeResponse(response: ChatResponse): ClaudeResponse {
-        val isFunctionCall = response.stopReason == "stop_sequence"
-                && response.stopSequence == "</function_calls>"
-        val responseMessage = response.content.single().text
-        return if (isFunctionCall) {
-            val justInvokeContent = responseMessage.substringAfter("<function_calls>")
-            val invocation = xmlMapper.readValue(justInvokeContent, InvokeRequest::class.java)
-            ClaudeResponse.ToolCall(
-                toolName = invocation.toolName,
-                arguments = invocation.arguments,
-                rawMessage = responseMessage)
-        } else ClaudeResponse.ChatResponse(responseMessage)
-    }
-
-    private fun getSerializableMessage(message: Message, okHttpClient: OkHttpClient): SerializableMessage {
-        return SerializableMessage(message.role, message.images.map { i ->
-            if (i.imageContents != null && i.mediaType != null) {
-                MessageContent.ImageContent(ResolvedImageContent(String(i.imageContents), i.mediaType))
-            } else {
-                val response = okHttpClient.newCall(Request.Builder().url(i.imageUrl!!).build()).execute()
-                val mediaType = response.headers("content-type").first()
-                val base64 = Base64.getEncoder().encodeToString(response.body?.bytes())
-                MessageContent.ImageContent(ResolvedImageContent(base64, mediaType))
-            }
-        }.plus(MessageContent.TextContent(message.message)))
+        val responseString = rawResponse.body?.string()
+        val response = mapper.readValue(responseString, SerializableMessage::class.java)
+        return response
     }
 }
