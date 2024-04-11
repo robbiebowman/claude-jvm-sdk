@@ -1,10 +1,6 @@
 package com.robbiebowman.claude
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties
-import com.fasterxml.jackson.annotation.JsonSubTypes
-import com.fasterxml.jackson.annotation.JsonTypeInfo
-import com.google.gson.annotations.SerializedName
-import kotlin.reflect.KClass
+import com.fasterxml.jackson.annotation.*
 
 /**
  * Role represents the author of a message. Claude's messages and tool calls will be Assistant. User responses and tool
@@ -13,10 +9,10 @@ import kotlin.reflect.KClass
  * The messages API will reject completion requests with messages from the same Role twice in a row.
  */
 enum class Role {
-    @SerializedName("user")
+    @JsonProperty("user")
     User,
 
-    @SerializedName("assistant")
+    @JsonProperty("assistant")
     Assistant
 }
 
@@ -49,29 +45,30 @@ data class SerializableMessage(
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY)
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
 @JsonSubTypes(
-    JsonSubTypes.Type(value = MessageContent.TextContent::class, name = "TextContent"),
-    JsonSubTypes.Type(value = MessageContent.ImageContent::class, name = "ImageContent"),
-    JsonSubTypes.Type(value = MessageContent.ToolUse::class, name = "ToolUse"),
-    JsonSubTypes.Type(value = MessageContent.ToolResult::class, name = "ToolResult")
+    JsonSubTypes.Type(value = MessageContent.TextContent::class, name = "text"),
+    JsonSubTypes.Type(value = MessageContent.ImageContent::class, name = "image"),
+    JsonSubTypes.Type(value = MessageContent.ToolUse::class, name = "tool_use"),
+    JsonSubTypes.Type(value = MessageContent.ToolResult::class, name = "tool_result")
 )
-sealed class MessageContent(val type: String) {
-    class TextContent(val text: String) : MessageContent("text")
-
-    class ImageContent(val source: ResolvedImageContent) : MessageContent("image")
-
-    class ToolUse(val id: String, val name: String, val input: Map<String, String>) : MessageContent("tool_use")
-
+sealed class MessageContent {
+    @JsonTypeName("text")
+    class TextContent(val text: String) : MessageContent()
+    @JsonTypeName("image")
+    class ImageContent(val source: ResolvedImageContent) : MessageContent()
+    @JsonTypeName("tool_use")
+    class ToolUse(val id: String, val name: String, val input: Map<String, String>) : MessageContent()
+    @JsonTypeName("tool_result")
     class ToolResult(
-        @SerializedName("tool_use_id") val toolUseId: String,
+        @JsonProperty("tool_use_id") val toolUseId: String,
         val content: String?
-    ) : MessageContent("tool_result")
+    ) : MessageContent()
 }
 
 data class ResolvedImageContent(
     val data: String,
-    @SerializedName("media_type") val mediaType: String
+    @JsonProperty("media_type") val mediaType: String
 ) {
     val type: String = "base64"
 }
