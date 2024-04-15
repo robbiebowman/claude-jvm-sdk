@@ -1,7 +1,14 @@
+# Installation
+
+[![Maven Central](https://img.shields.io/maven-central/v/com.robbiebowman/claude-sdk?label=Maven%20Central)](https://search.maven.org/artifact/com.robbiebowman/claude-sdk)
+
+```groovy
+implementation 'com.robbiebowman:claude-sdk:0.0.2b'
+```
+
 # About
 
-This is a library for using Claude via the Anthropic API. It is built in Kotlin and has some special features for it 
-(lambda references for tool definitions) but will work with Java too.
+This is a library for using Claude via the Anthropic API. It is built in Kotlin.
 
 # Usage
 
@@ -34,11 +41,4 @@ val claudeClient = ClaudeClientBuilder()
     .withModel(ClaudeModel.Haiku)
     .withTool(::getSurfaceTemp)
     .build()
-```
-
-# Installation
-
-TODO: Publish to Maven Central.
-```groovy
-implementation project(':claude-sdk')
 ```
