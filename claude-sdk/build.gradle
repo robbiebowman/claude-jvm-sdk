@@ -24,7 +24,7 @@ mavenPublishing {
     publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
     signAllPublications()
 
-    coordinates("com.robbiebowman", "claude-sdk", "0.0.2b")
+    coordinates("com.robbiebowman", "claude-sdk", "0.0.3")
 
     pom {
         name = 'Claude SDK'

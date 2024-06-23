@@ -1,15 +1,8 @@
 import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.MapperFeature
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.dataformat.xml.JacksonXmlModule
-import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.robbiebowman.claude.SerializableMessage
 import org.junit.Test
 import kotlin.test.assertNotNull
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
-import com.robbiebowman.claude.SerializableMessage
-import com.robbiebowman.claude.xml.InvokeRequest
-import kotlin.test.assertEquals
 
 class JsonDeserialisationTest {
     @Test

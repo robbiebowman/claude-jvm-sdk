@@ -3,7 +3,7 @@
 [![Maven Central](https://img.shields.io/maven-central/v/com.robbiebowman/claude-sdk?label=Maven%20Central)](https://search.maven.org/artifact/com.robbiebowman/claude-sdk)
 
 ```groovy
-implementation 'com.robbiebowman:claude-sdk:0.0.2b'
+implementation 'com.robbiebowman:claude-sdk:0.0.3'
 ```
 
 # About

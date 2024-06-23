@@ -1,6 +1,7 @@
 package com.robbiebowman.claude
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 import com.robbiebowman.claude.json.ChatRequestBody
 import com.robbiebowman.claude.json.JsonSchemaTool
 import okhttp3.OkHttpClient
@@ -40,5 +41,9 @@ class ClaudeClient internal constructor(
         val responseString = rawResponse.body?.string()
         val response = mapper.readValue(responseString, SerializableMessage::class.java)
         return response
+    }
+
+    fun <T> derserializeToolUse(json: String, clazz: Class<T>): T {
+        return mapper.readValue(json, clazz)
     }
 }

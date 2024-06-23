@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
+import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.databind.ser.impl.SimpleBeanPropertyFilter
 import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider
 import com.fasterxml.jackson.module.jsonSchema.JsonSchema
@@ -30,6 +31,7 @@ class ClaudeClientBuilder {
     private var mapper = jacksonObjectMapper().apply {
         propertyNamingStrategy = PropertyNamingStrategies.SNAKE_CASE
         setSerializationInclusion(JsonInclude.Include.NON_NULL)
+        configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false)
         configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
         addMixIn(JsonSchema::class.java, IgnoreRequiredFieldFilter::class.java)
         setFilterProvider(IgnoreRequiredFieldFilter.provider)

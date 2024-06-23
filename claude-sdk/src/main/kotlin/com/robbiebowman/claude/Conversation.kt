@@ -1,6 +1,8 @@
 package com.robbiebowman.claude
 
 import com.fasterxml.jackson.annotation.*
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize
+import com.robbiebowman.claude.json.FlexibleStringDeserializer
 
 /**
  * Role represents the author of a message. Claude's messages and tool calls will be Assistant. User responses and tool
@@ -55,10 +57,17 @@ data class SerializableMessage(
 sealed class MessageContent {
     @JsonTypeName("text")
     class TextContent(val text: String) : MessageContent()
+
     @JsonTypeName("image")
     class ImageContent(val source: ResolvedImageContent) : MessageContent()
+
     @JsonTypeName("tool_use")
-    class ToolUse(val id: String, val name: String, val input: Map<String, String>) : MessageContent()
+    class ToolUse(
+        val id: String,
+        val name: String,
+        @JsonDeserialize(using = FlexibleStringDeserializer::class) val input: Map<String, String>
+    ) : MessageContent()
+
     @JsonTypeName("tool_result")
     class ToolResult(
         @JsonProperty("tool_use_id") val toolUseId: String,

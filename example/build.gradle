@@ -10,7 +10,7 @@ dependencies {
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0'
     implementation 'org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-    //implementation project(':claude-sdk')
-    implementation 'com.robbiebowman:claude-sdk:0.0.2b'
+    implementation project(':claude-sdk')
+    //implementation 'com.robbiebowman:claude-sdk:0.0.2b'
     testImplementation 'org.jetbrains.kotlin:kotlin-test'
 }
