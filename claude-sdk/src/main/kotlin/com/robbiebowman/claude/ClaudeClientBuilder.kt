@@ -15,6 +15,8 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.robbiebowman.claude.json.IgnoreRequiredFieldFilter
 import com.robbiebowman.claude.json.JsonSchemaTool
 import okhttp3.OkHttpClient
+import java.time.Duration
+import java.time.temporal.ChronoUnit
 import kotlin.reflect.KAnnotatedElement
 import kotlin.reflect.KFunction
 import kotlin.reflect.javaType
@@ -26,7 +28,11 @@ import kotlin.reflect.javaType
  */
 class ClaudeClientBuilder {
 
-    private var okHttpClient: OkHttpClient = OkHttpClient()
+    private var okHttpClient: OkHttpClient = OkHttpClient().newBuilder().apply {
+        callTimeout(Duration.of(180, ChronoUnit.MINUTES))
+        readTimeout(Duration.of(180, ChronoUnit.MINUTES))
+        writeTimeout(Duration.of(180, ChronoUnit.MINUTES))
+    }.build()
     val toolDefinitions = mutableListOf<JsonSchemaTool>()
     private var mapper = jacksonObjectMapper().apply {
         propertyNamingStrategy = PropertyNamingStrategies.SNAKE_CASE
